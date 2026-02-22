@@ -71,7 +71,8 @@ export const AppContextProvider = ({ children }: AppContextProviderProps) => {
   }, []);
 
   const signup = async (email: string, password: string) => {
-    const { data, error } = await supabase.auth.signUp({ email, password });
+    const { data, error } = await supabase.auth.signUp({ email, password }); 
+    debugger;
     if (error) throw error;
     configureSessionUserData(data.session);
     navigate("/");
@@ -81,7 +82,7 @@ export const AppContextProvider = ({ children }: AppContextProviderProps) => {
     const { data, error } = await supabase.auth.signInWithPassword({
       email,
       password,
-    });
+    });debugger;
     if (error) throw error;
     configureSessionUserData(data.session);
     navigate("/");
