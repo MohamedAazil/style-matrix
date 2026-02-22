@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useAppContext } from "@/context/AppContext"; // 1. Import the context hook
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -16,29 +17,38 @@ export function Login() {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  
+  // 2. Access the login and signup functions from your Global Manager
+  const { login, signup } = useAppContext();
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (isSignUp) {
-      console.log("Registering user:", { name, email, password });
-      // Registration backend call here
-    } else {
-      console.log("Logging in user:", { email, password });
-      // Login backend call here
+    try {
+      if (isSignUp) {
+        // Calls the Supabase signup logic from AppContext
+        await signup(email, password);
+        console.log("Registration successful");
+      } else {
+        // Calls the Supabase login logic from AppContext
+        await login(email, password);
+        console.log("Login successful");
+      }
+      // Note: Navigation to "/" is handled automatically inside AppContext.tsx
+    } catch (error: any) {
+      console.error("Auth error:", error.message);
+      alert(error.message || "Authentication failed. Please try again.");
     }
   };
 
   const handleGoogleAuth = () => {
     console.log("Redirecting to Google Auth...");
-    // Google OAuth integration here
+    // Future: Add Google OAuth logic here using supabase.auth.signInWithOAuth()
   };
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-stone-100 p-4">
-      {/* Elite Modular Box - Sharp corners and heavy shadow for floating effect */}
       <Card className="w-full max-w-md border-0 bg-white shadow-2xl rounded-none">
         <CardHeader className="space-y-3 text-center pb-8 pt-12">
-          {/* Times New Roman / Serif style for high-end fashion aesthetic */}
           <CardTitle className="font-serif text-3xl tracking-tight text-stone-900">
             STYLE MATRIX
           </CardTitle>
@@ -49,8 +59,6 @@ export function Login() {
         
         <CardContent className="space-y-6">
           <form onSubmit={handleSubmit} className="space-y-5">
-            
-            {/* Conditional Name Field for Sign Up */}
             {isSignUp && (
               <div className="space-y-2">
                 <Label htmlFor="name" className="text-[10px] uppercase tracking-widest text-stone-600 font-bold">
@@ -61,7 +69,7 @@ export function Login() {
                   type="text"
                   placeholder="Jane Doe"
                   value={name}
-                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => setName(e.target.value)}
+                  onChange={(e) => setName(e.target.value)}
                   required
                   className="rounded-none border-stone-300 focus-visible:ring-stone-800 focus-visible:ring-1 h-11"
                 />
@@ -77,7 +85,7 @@ export function Login() {
                 type="email"
                 placeholder="name@example.com"
                 value={email}
-                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setEmail(e.target.value)}
+                onChange={(e) => setEmail(e.target.value)}
                 required
                 className="rounded-none border-stone-300 focus-visible:ring-stone-800 focus-visible:ring-1 h-11"
               />
@@ -98,7 +106,7 @@ export function Login() {
                 id="password"
                 type="password"
                 value={password}
-                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setPassword(e.target.value)}
+                onChange={(e) => setPassword(e.target.value)}
                 required
                 className="rounded-none border-stone-300 focus-visible:ring-stone-800 focus-visible:ring-1 h-11"
               />
@@ -112,7 +120,6 @@ export function Login() {
             </Button>
           </form>
 
-          {/* Divider */}
           <div className="relative pt-2">
             <div className="absolute inset-0 flex items-center">
               <span className="w-full border-t border-stone-200" />
@@ -122,14 +129,13 @@ export function Login() {
             </div>
           </div>
 
-          {/* Google Login Button */}
           <Button
             type="button"
             variant="outline"
             onClick={handleGoogleAuth}
             className="w-full rounded-none border-stone-300 hover:bg-stone-50 h-12 text-stone-700 transition-all"
           >
-            <svg className="mr-3 h-4 w-4" aria-hidden="true" focusable="false" data-prefix="fab" data-icon="google" role="img" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 488 512">
+            <svg className="mr-3 h-4 w-4" aria-hidden="true" focusable="false" viewBox="0 0 488 512">
               <path fill="currentColor" d="M488 261.8C488 403.3 391.1 504 248 504 110.8 504 0 393.2 0 256S110.8 8 248 8c66.8 0 123 24.5 166.3 64.9l-67.5 64.9C258.5 52.6 94.3 116.6 94.3 256c0 86.5 69.1 156.6 153.7 156.6 98.2 0 135-70.4 140.8-106.9H248v-85.3h236.1c2.3 12.7 3.9 24.9 3.9 41.4z"></path>
             </svg>
             <span className="uppercase tracking-widest text-xs font-semibold">Google</span>
