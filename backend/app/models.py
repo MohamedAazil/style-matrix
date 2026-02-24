@@ -3,6 +3,22 @@ from .database import Base
 from pgvector.sqlalchemy import Vector
 from datetime import datetime, timezone
 from sqlalchemy.orm import relationship
+
+class ClothingItem(Base):
+    __tablename__ = "clothing_items"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String)
+    category = Column(String)
+    color = Column(String)
+    season = Column(String)
+    gender = Column(String)
+    image_path = Column(String)
+    user_id = Column(Integer, ForeignKey("users.id"))
+    user = relationship("User", back_populates="clothing_items")
+    embedding = Column(Vector)
+    attribute_links = relationship("ClothingItemAttribute", back_populates="clothing_item")
+
 class User(Base):
     __tablename__ = "users"
 
