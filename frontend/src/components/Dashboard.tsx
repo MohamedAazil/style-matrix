@@ -17,7 +17,7 @@ export default function Dashboard() {
     <div className="min-h-screen bg-slate-950 text-white font-sans">
       {/* Subtle background pattern for glass effect */}
       <div className="fixed inset-0 z-0 opacity-50">
-        <div className="absolute inset-0 bg-gradient-to-br from-indigo-950 via-slate-950 to-rose-950"></div>
+        <div className="absolute inset-0 bg-linear-to-br from-indigo-950 via-slate-950 to-rose-950"></div>
       </div>
       
       <Sidebar activePage={activePage} setActivePage={setActivePage} />
@@ -64,7 +64,7 @@ const Sidebar = ({ activePage, setActivePage }: { activePage: string, setActiveP
     >
       <h1 className="text-2xl font-bold tracking-tighter mb-12">Style Matrix</h1>
       
-      <nav className="flex-grow">
+      <nav className="grow">
         <ul className="space-y-3">
           {navItems.map((item) => (
             <li key={item.name}>
