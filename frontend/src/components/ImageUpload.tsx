@@ -1,8 +1,8 @@
-import { useState, useRef, DragEvent } from "react";
+import React, { useState, useRef } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import { useAppContext } from "@/context/AppContext";
-import { AnimatePresence, motion } from "framer-motion";
-import { UploadCloud, FileImage, X } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
+import { UploadCloud, FileImage, X, Loader2 } from "lucide-react";
 
 export default function ImageUpload() {
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
@@ -13,85 +13,79 @@ export default function ImageUpload() {
   
   const { BACKEND_URL, session } = useAppContext();
 
-  // --- Event Handlers ---
+  // --- 1. Safe File Handling ---
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files) {
-      addFiles(Array.from(e.target.files));
+      const newFiles = Array.from(e.target.files);
+      setSelectedFiles((prev) => [...prev, ...newFiles]);
     }
   };
-  
-  const handleSelectImages = () => fileInputRef.current?.click();
 
-  const handleDragEnter = (e: DragEvent<HTMLDivElement>) => {
+  const removeFile = (indexToRemove: number) => {
+    setSelectedFiles((prev) => prev.filter((_, index) => index !== indexToRemove));
+  };
+
+  // --- 2. Safe Drag and Drop (TypeScript fixed) ---
+  const onDragOver = (e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault();
     setIsDragging(true);
   };
 
-  const handleDragLeave = (e: DragEvent<HTMLDivElement>) => {
+  const onDragLeave = (e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault();
     setIsDragging(false);
   };
 
-  const handleDragOver = (e: DragEvent<HTMLDivElement>) => e.preventDefault(); // Necessary for onDrop to fire
-
-  const handleDrop = (e: DragEvent<HTMLDivElement>) => {
+  const onDrop = (e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault();
     setIsDragging(false);
     if (e.dataTransfer.files) {
-      addFiles(Array.from(e.dataTransfer.files));
+      // Only accept image files
+      const droppedFiles = Array.from(e.dataTransfer.files).filter(file => file.type.startsWith('image/'));
+      setSelectedFiles((prev) => [...prev, ...droppedFiles]);
     }
   };
-  
-  const addFiles = (files: File[]) => {
-    // Optionally filter for image types
-    const imageFiles = files.filter(file => file.type.startsWith('image/'));
-    setSelectedFiles(prevFiles => [...prevFiles, ...imageFiles]);
-    setStatus(`${imageFiles.length} image(s) selected.`);
-  };
 
-      // Upload to Supabase Storage
-      
-      const imageUrl = await uploadImageToSupabase(file , "clothingImages");
-        //console.log(imageUrl);
-        imageUrls.push(imageUrl)
-
-
-  // --- Submit Logic ---
+  // --- 3. Backend Integration ---
   const handleSubmit = async () => {
-    if (selectedFiles.length === 0) return setStatus("Please select an image first.");
+    if (selectedFiles.length === 0) return alert("Please select an image first.");
     
     setLoading(true);
-    const totalFiles = selectedFiles.length;
+    setStatus("Uploading to your digital closet...");
     const imageUrls: string[] = [];
-    
+
     try {
-      for (const [index, file] of selectedFiles.entries()) {
-        setStatus(`Uploading ${index + 1} of ${totalFiles}...`);
-        
+      // Step A: Upload to Supabase Storage
+      for (const file of selectedFiles) {
         const fileExt = file.name.split('.').pop();
-        const fileName = `${session?.user.id}/${Math.random()}.${fileExt}`;
+        const fileName = `${Math.random()}.${fileExt}`;
         
-        const { error: uploadError } = await supabase.storage.from("clothing-images").upload(fileName, file);
+        const { error: uploadError } = await supabase.storage
+          .from("clothing-images")
+          .upload(fileName, file);
+
         if (uploadError) throw uploadError;
 
         const { data } = supabase.storage.from("clothing-images").getPublicUrl(fileName);
         imageUrls.push(data.publicUrl);
       }
 
-      setStatus("AI is analyzing your items...");
+      setStatus("AI is analyzing category and style...");
+
+      // Step B: Send to FastAPI Double Engine
       const response = await fetch(`${BACKEND_URL}/api/wardrobe/add-clothing`, {
         method: "POST",
-        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${session?.access_token}` },
-        body: JSON.stringify(imageUrls),
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${session?.access_token}`
+        },
+        body: JSON.stringify(imageUrls), 
       });
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.detail || "AI processing failed.");
-      }
+      if (!response.ok) throw new Error("AI Processing Failed");
 
-      setStatus(`Success! ${totalFiles} new item(s) added to your wardrobe.`);
-      setSelectedFiles([]);
+      setStatus("Successfully added to your wardrobe!");
+      setSelectedFiles([]); // Clear out the list
       
     } catch (error: any) {
       console.error(error);
@@ -101,78 +95,88 @@ export default function ImageUpload() {
     }
   };
 
+  // --- 4. The Elite UI ---
   return (
-    <div className="w-full max-w-4xl mx-auto space-y-8">
-      {/* Dropzone */}
-      <motion.div
-        initial={{ opacity: 0, y: -20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5 }}
-        onDragEnter={handleDragEnter}
-        onDragLeave={handleDragLeave}
-        onDragOver={handleDragOver}
-        onDrop={handleDrop}
-        onClick={handleSelectImages}
-        className={`relative flex flex-col items-center justify-center p-12 rounded-2xl cursor-pointer
-                    bg-black/30 backdrop-blur-xl border-2 border-dashed border-white/20
-                    transition-all duration-300 ease-in-out
-                    ${isDragging ? 'border-solid border-indigo-400 scale-105 bg-indigo-950/40' : ''}`}
-      >
-        <div className="absolute top-0 left-0 w-full h-full bg-gradient-to-br from-white/5 to-transparent rounded-2xl pointer-events-none"></div>
-        <UploadCloud className={`w-16 h-16 text-gray-400 transition-transform duration-300 ${isDragging ? 'scale-110' : ''}`} />
-        <p className="mt-4 text-lg font-semibold text-white">Drag & Drop Your Images</p>
-        <p className="text-sm text-gray-400">or click to select files</p>
-        <input type="file" multiple accept="image/*" ref={fileInputRef} onChange={handleFileChange} className="hidden" />
-      </motion.div>
+    <div className="w-full max-w-2xl mx-auto p-8 bg-white/40 dark:bg-zinc-950/40 backdrop-blur-xl rounded-none border border-zinc-200 dark:border-zinc-800 shadow-sm">
+      <div className="mb-8">
+        <h2 className="text-2xl font-serif tracking-wide text-zinc-900 dark:text-zinc-100">DIGITIZE WARDROBE</h2>
+        <p className="text-xs uppercase tracking-widest text-zinc-500 mt-2">{status}</p>
+      </div>
 
-      {/* Uploads and Status Section */}
-      {(selectedFiles.length > 0 || loading) && (
-        <motion.div 
-          initial={{ opacity: 0, height: 0 }}
-          animate={{ opacity: 1, height: 'auto' }}
-          className="bg-black/30 backdrop-blur-xl border border-white/10 rounded-2xl p-6"
-        >
-          <div className="flex justify-between items-center mb-4">
-            <h3 className="font-semibold text-lg">Upload Queue ({selectedFiles.length})</h3>
-            <p className={`text-sm font-medium ${status.includes('Error') ? 'text-red-400' : 'text-gray-300'}`}>{status}</p>
-          </div>
-          
-          <div className="space-y-3 max-h-48 overflow-y-auto pr-2">
-            <AnimatePresence>
-              {selectedFiles.map((file) => (
-                <motion.div
-                  key={file.name}
-                  layout
-                  initial={{ opacity: 0, y: -10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, x: -20 }}
-                  className="flex items-center justify-between bg-white/5 p-3 rounded-lg"
-                >
-                  <div className="flex items-center gap-3">
-                    <FileImage className="w-5 h-5 text-gray-400" />
-                    <span className="text-sm text-gray-200 truncate">{file.name}</span>
-                  </div>
-                  <button onClick={() => removeFile(file.name)} disabled={loading} className="p-1 rounded-full text-gray-500 hover:text-white hover:bg-white/10 disabled:opacity-50">
-                    <X className="w-4 h-4" />
-                  </button>
-                </motion.div>
-              ))}
-            </AnimatePresence>
-          </div>
-          
-          <div className="mt-6 pt-6 border-t border-white/10">
-            <button
-              onClick={handleSubmit}
-              disabled={loading || selectedFiles.length === 0}
-              className="w-full py-3 px-6 rounded-lg text-sm font-semibold text-white bg-indigo-600 
-                         hover:bg-indigo-500 disabled:bg-gray-600 disabled:opacity-70 disabled:cursor-not-allowed
-                         transition-all duration-300"
+      <input
+        type="file"
+        multiple
+        accept="image/*"
+        ref={fileInputRef}
+        onChange={handleFileChange}
+        className="hidden"
+      />
+
+      {/* Drag & Drop Zone */}
+      <div
+        onDragOver={onDragOver}
+        onDragLeave={onDragLeave}
+        onDrop={onDrop}
+        onClick={() => fileInputRef.current?.click()}
+        className={`relative flex flex-col items-center justify-center w-full h-48 border-2 border-dashed cursor-pointer transition-all duration-300 ease-in-out ${
+          isDragging 
+            ? "border-zinc-900 dark:border-zinc-100 bg-zinc-100/50 dark:bg-zinc-900/50" 
+            : "border-zinc-300 dark:border-zinc-700 hover:border-zinc-500 dark:hover:border-zinc-500 hover:bg-zinc-50/50 dark:hover:bg-zinc-900/30"
+        }`}
+      >
+        <UploadCloud className={`w-10 h-10 mb-4 transition-colors ${isDragging ? "text-zinc-900 dark:text-zinc-100" : "text-zinc-400"}`} />
+        <p className="text-sm font-medium text-zinc-600 dark:text-zinc-400">
+          {isDragging ? "Drop images here" : "Click or drag images to upload"}
+        </p>
+        <p className="text-xs text-zinc-400 mt-2">JPG, PNG, HEIC</p>
+      </div>
+
+      {/* Selected Files List with Framer Motion */}
+      <div className="mt-6 space-y-2">
+        <AnimatePresence>
+          {selectedFiles.map((file, index) => (
+            <motion.div
+              key={`${file.name}-${index}`}
+              initial={{ opacity: 0, y: -10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, x: -20 }}
+              className="flex items-center justify-between bg-zinc-100/50 dark:bg-zinc-900/50 backdrop-blur-md p-3 border border-zinc-200 dark:border-zinc-800"
             >
-              {loading ? 'Processing...' : `Upload & Analyze ${selectedFiles.length} Item(s)`}
-            </button>
-          </div>
-        </motion.div>
-      )}
+              <div className="flex items-center gap-3">
+                <FileImage className="w-4 h-4 text-zinc-500" />
+                <span className="text-xs font-medium text-zinc-700 dark:text-zinc-300 truncate max-w-50">
+                  {file.name}
+                </span>
+              </div>
+              <button 
+                onClick={() => removeFile(index)} 
+                disabled={loading} 
+                className="p-1 text-zinc-400 hover:text-red-500 transition-colors disabled:opacity-50"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </motion.div>
+          ))}
+        </AnimatePresence>
+      </div>
+      
+      {/* Upload Button */}
+      <div className="mt-8">
+        <button
+          onClick={handleSubmit}
+          disabled={loading || selectedFiles.length === 0}
+          className="w-full flex items-center justify-center py-4 px-6 text-xs uppercase tracking-widest font-bold text-white bg-zinc-900 hover:bg-zinc-800 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-200 disabled:bg-zinc-300 dark:disabled:bg-zinc-800 disabled:text-zinc-500 transition-colors"
+        >
+          {loading ? (
+            <>
+              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+              Processing...
+            </>
+          ) : (
+            `Upload & Analyze (${selectedFiles.length})`
+          )}
+        </button>
+      </div>
     </div>
   );
 }
