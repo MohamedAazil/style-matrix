@@ -197,7 +197,7 @@ def suggest_outfit_from_text(prompt: str, db: Session, user_id: str):
         "full": (36, 50),
     }
     for slot in slots:
-        # Note: Added category filter back in so 'top' doesn't return 'shoes'
+        # THE BACKEND FIX: This SQL query completely blinds the AI to dirty clothes
         query = text("""
             WITH scored_items AS(
                 SELECT 
@@ -205,33 +205,30 @@ def suggest_outfit_from_text(prompt: str, db: Session, user_id: str):
                     image_url, 
                     category, 
                     embedding, 
-                    COALESCE(EXTRACT(DAY FROM (NOW() - last_worn_date)), 100) as last_worn_days, 
                     (1 - (embedding <=> :text_emb)) as similarity
                 FROM clothing_items
                 WHERE user_id = :user_id
                 AND category::int BETWEEN :start AND :end
+                -- THE 3-DAY RULE: Only grab items never worn, or worn over 3 days ago
+                AND (last_worn_date IS NULL OR last_worn_date <= NOW() - INTERVAL '3 days')
             )
-            SELECT id, image_url, category, similarity, embedding,
-            (similarity * (1.0 / GREATEST(1.0, 5.0 - last_worn_days))) as final_rank_score   
+            SELECT id, image_url, category, similarity, embedding, similarity as final_rank_score   
             FROM scored_items
             ORDER BY final_rank_score DESC
             LIMIT 5
         """)
         
         results = db.execute(query, {
-            "slot_cat": slot,
             "text_emb": vector_to_pgvector(text_vector), 
             "user_id": user.id,
-            "start":slotMapping[slot][0],
-            "end":slotMapping[slot][1],
+            "start": slotMapping[slot][0],
+            "end": slotMapping[slot][1],
         }).fetchall()
 
         outfit_candidates[slot] = results
-        print(results)
         
         # Fill the cache with the 512-dim vectors from the DB
         for row in results:
-            # pgvector returns a list/numpy array. We store it by its URL or ID.
             local_embeddings_cache[row.image_url] = parse_pgvector(row.embedding)
 
     # 3. Use the Compatibility Model

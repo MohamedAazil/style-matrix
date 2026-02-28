@@ -1,6 +1,7 @@
 import torch
 from torch.utils.data import DataLoader
 from torchvision import transforms
+from sklearn.metrics import classification_report, precision_score
 
 from dataset import DeepFashionDataset
 from ai_model import FashionModel
@@ -21,13 +22,18 @@ val_loader = DataLoader(val_dataset, batch_size=BATCH_SIZE, shuffle=False, num_w
 
 print("loading model")
 model = FashionModel()
-model.load_state_dict(torch.load(MODEL_SAVE_PATH, map_location=DEVICE))
+#model.load_state_dict(torch.load(MODEL_SAVE_PATH, map_location=DEVICE))
+model.load_state_dict(torch.load(MODEL_SAVE_PATH, map_location=DEVICE, weights_only=False))
 model.to(DEVICE)
 model.eval()
 
 print("evaluating")
 correct = 0
 total = 0
+
+all_preds = []
+all_labels = []
+
 try: 
     with torch.no_grad():
         for i, (images, labels) in enumerate(val_loader):
@@ -40,9 +46,21 @@ try:
             _, preds = torch.max(outputs, 1)
             correct += (preds == labels).sum().item()
             total += labels.size(0)
+
+            all_preds.extend(preds.cpu().numpy())
+            all_labels.extend(labels.cpu().numpy())
+
+
 except KeyboardInterrupt as e: 
     print("interrupted")
         
     
 accuracy = correct / total
 print(f"model accuracy:  {accuracy:.4f}")
+
+print("\n--- DETAILED AI EVALUATION ---")
+macro_precision = precision_score(all_labels, all_preds, average='macro', zero_division=0)
+print(f"Macro-Average Precision: {macro_precision:.4f}")
+
+print("\nFull Classification Report (Precision, Recall, F1):")
+print(classification_report(all_labels, all_preds, zero_division=0))

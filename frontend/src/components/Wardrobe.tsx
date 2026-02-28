@@ -97,12 +97,13 @@ import { useEffect, useState } from "react";
 export default function Wardrobe() {
   const [images, setImages] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState<"available" | "laundry">("available");
   const { BACKEND_URL, session } = useAppContext();
 
   useEffect(() => {
     const fetchWardrobe = async () => {
       try {
-        const response = await fetch(`${BACKEND_URL}/api/wardrobe/items?count=25`, {
+        const response = await fetch(`${BACKEND_URL}/api/wardrobe/items?count=100`, {
           headers: {
             "Authorization": `Bearer ${session?.access_token}`
           }
@@ -123,24 +124,68 @@ export default function Wardrobe() {
     }
   }, [session, BACKEND_URL]);
 
+  // --- 3-Day Cooldown Math ---
+  const now = new Date();
+  
+  const availableItems = images.filter(item => {
+    if (!item.last_worn_date) return true; // Never worn = Available
+    const diffDays = (now.getTime() - new Date(item.last_worn_date).getTime()) / (1000 * 3600 * 24);
+    return diffDays >= 3; 
+  });
+
+  const laundryItems = images.filter(item => {
+    if (!item.last_worn_date) return false;
+    const diffDays = (now.getTime() - new Date(item.last_worn_date).getTime()) / (1000 * 3600 * 24);
+    return diffDays < 3; // Worn recently = In the Wash
+  });
+
   if (loading) return <div className="text-gray-500 mt-10">Loading your closet...</div>;
   if (images.length === 0) return <div className="text-gray-500 mt-10">Your closet is empty. Add some items!</div>;
 
+  const displayItems = activeTab === "available" ? availableItems : laundryItems;
+
   return (
-    <div className="grid grid-cols-2 md:grid-cols-4 gap-6 mt-6">
-      {images && images.map((item, index) => (
-        <div key={index} className="rounded-lg overflow-hidden shadow-sm border border-gray-200 bg-white">
-          <img
-            src={item.image_url} // Using the direct Supabase URL
-            alt="Clothing item"
-            className="w-full h-48 object-cover"
-          />
-          <div className="p-3 text-sm text-gray-700 font-medium">
-             {/* Replace with your ResNet category label mapping if needed */}
-            Category: {item.category} 
-          </div>
+    <div className="mt-6">
+      {/* Dropdown Menu Header */}
+      <div className="flex justify-between items-center mb-6">
+        <h2 className="text-2xl font-bold">My Wardrobe</h2>
+        <select 
+          value={activeTab} 
+          onChange={(e) => setActiveTab(e.target.value as "available" | "laundry")}
+          className="bg-white border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-indigo-500 focus:border-indigo-500 block p-2.5 shadow-sm"
+        >
+          <option value="available">Available ({availableItems.length})</option>
+          <option value="laundry">In the Wash ({laundryItems.length})</option>
+        </select>
+      </div>
+
+      {displayItems.length === 0 ? (
+        <div className="text-gray-500 mt-10 italic">
+          {activeTab === "available" ? "No clean clothes available!" : "Nothing in the laundry right now."}
         </div>
-      ))}
+      ) : (
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-6 mt-6">
+          {displayItems.map((item, index) => (
+            <div key={index} className={`rounded-lg overflow-hidden shadow-sm border border-gray-200 bg-white relative ${activeTab === 'laundry' ? 'opacity-60 grayscale' : ''}`}>
+              <img
+                src={item.image_url} 
+                alt="Clothing item"
+                className="w-full h-48 object-cover"
+              />
+              <div className="p-3 text-sm text-gray-700 font-medium border-t border-gray-100">
+                Category: {item.category} 
+              </div>
+              
+              {/* Red Timestamp overlay for laundry items */}
+              {activeTab === 'laundry' && item.last_worn_date && (
+                <div className="absolute top-0 left-0 w-full bg-red-500/90 text-white text-[10px] uppercase font-bold text-center py-1">
+                  Worn: {new Date(item.last_worn_date).toLocaleDateString()}
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
