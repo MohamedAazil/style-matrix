@@ -156,6 +156,7 @@ def get_top_compatible_outfits(outfit_candidates, model, embeddings_cache):
 
 def suggest_outfit_from_text(prompt: str, db: Session, user_id: str):
     user = get_user(db, user_id)
+    print("user id", user.id)
     
     # 1. Encode the text prompt
     text_inputs = processor(text=[prompt], return_tensors="pt", padding=True).to(DEVICE)
@@ -216,6 +217,7 @@ def suggest_outfit_from_text(prompt: str, db: Session, user_id: str):
         }).fetchall()
 
         outfit_candidates[slot] = results
+        print(results)
         
         # Fill the cache with the 512-dim vectors from the DB
         for row in results:

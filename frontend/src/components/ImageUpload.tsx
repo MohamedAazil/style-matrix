@@ -1,8 +1,8 @@
 import { useAppContext } from "@/context/AppContext";
-import { supabase } from "@/lib/supabaseClient";
 import { AnimatePresence, motion } from "framer-motion";
 import { FileImage, Loader2, UploadCloud, X } from "lucide-react";
 import React, { useRef, useState } from "react";
+import { uploadImageToSupabase } from "../../helper";
 
 export default function ImageUpload() {
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
@@ -57,17 +57,9 @@ export default function ImageUpload() {
     try {
       // Step A: Upload to Supabase Storage
       for (const file of selectedFiles) {
-        const fileExt = file.name.split('.').pop();
-        const fileName = `${Math.random()}.${fileExt}`;
         
-        const { error: uploadError } = await supabase.storage
-          .from("clothing-images")
-          .upload(fileName, file);
-
-        if (uploadError) throw uploadError;
-
-        const { data } = supabase.storage.from("clothing-images").getPublicUrl(fileName);
-        imageUrls.push(data.publicUrl);
+        const url = await uploadImageToSupabase(file, "clothing-items")
+        imageUrls.push(url);
       }
 
       setStatus("AI is analyzing category and style...");
@@ -79,7 +71,7 @@ export default function ImageUpload() {
           "Content-Type": "application/json",
           "Authorization": `Bearer ${session?.access_token}`
         },
-        body: JSON.stringify(imageUrls), 
+        body: JSON.stringify({"imageUrls":imageUrls}), 
       });
 
       if (!response.ok) throw new Error("AI Processing Failed");
