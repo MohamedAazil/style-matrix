@@ -21,7 +21,7 @@ compatibility_model.eval()  # important for inference
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 data_path = os.path.join(BASE_DIR, "..", "data", "polyvore")
-embeddings = torch.load(os.path.join(data_path, "fashion_clip_embeddings.pt"))
+embeddings = torch.load(os.path.join(data_path, "fashion_clip_embeddings.pt"), weights_only=False)
 CLIP_MODEL_ID = "patrickjohncyh/fashion-clip"
 processor = CLIPProcessor.from_pretrained(CLIP_MODEL_ID)
 clip_model = CLIPModel.from_pretrained(CLIP_MODEL_ID).to(DEVICE)
@@ -214,23 +214,20 @@ def suggest_outfit_from_text(prompt: str, db: Session, user_id: str):
             (similarity * (1.0 / GREATEST(1.0, 5.0 - last_worn_days))) as final_rank_score   
             FROM scored_items
             ORDER BY final_rank_score DESC
-            LIMIT 5
+            LIMIT 5 
         """)
         
         results = db.execute(query, {
-            "slot_cat": slot,
             "text_emb": vector_to_pgvector(text_vector), 
             "user_id": user.id,
-            "start":slotMapping[slot][0],
-            "end":slotMapping[slot][1],
+            "start": slotMapping[slot][0],
+            "end": slotMapping[slot][1],
         }).fetchall()
 
         outfit_candidates[slot] = results
-        print(results)
         
         # Fill the cache with the 512-dim vectors from the DB
         for row in results:
-            # pgvector returns a list/numpy array. We store it by its URL or ID.
             local_embeddings_cache[row.image_url] = parse_pgvector(row.embedding)
 
     # 3. Use the Compatibility Model
