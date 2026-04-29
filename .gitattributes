@@ -1,0 +1,2 @@
+backend/app/ai/fashion_resnet50.pth filter=lfs diff=lfs merge=lfs -text
+backend/data/polyvore/train.json filter=lfs diff=lfs merge=lfs -text
