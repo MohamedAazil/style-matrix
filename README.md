@@ -240,18 +240,23 @@ Every endpoint needs a Supabase login token in the `Authorization: Bearer <token
 
 **Example: add clothing**
 
-```json
-// POST /api/wardrobe/add-clothing
-{ "imageUrls": ["https://YOUR-PROJECT.supabase.co/storage/v1/object/public/YOUR-BUCKET/shirt.png"] }
+`POST /api/wardrobe/add-clothing`
 
-// Response
+```json
+{ "imageUrls": ["https://YOUR-PROJECT.supabase.co/storage/v1/object/public/YOUR-BUCKET/shirt.png"] }
+```
+
+Response:
+
+```json
 { "response": "Images created", "added": 1, "failed": 0, "status_code": 201 }
 ```
 
 **Example: get suggestions**
 
+`GET /api/recommendation/recommend?prompt=casual%20weekend`
+
 ```json
-// GET /api/recommendation/recommend?prompt=casual%20weekend
 {
   "recommendations": [
     {
